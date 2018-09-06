@@ -21,8 +21,8 @@ import numpy as np
 
 path = '/Users/josephpope/GitHub/Kojak/data/'
 
-df1 = pd.read_excel('Full Madden 19 Ratings.xlsx')
-df2 = pd.read_excel('Madden 18 Player Ratings.xlsx')
+df1 = pd.read_excel('data/Full Madden 19 Ratings.xlsx')
+df2 = pd.read_excel('data/Madden 18 Player Ratings.xlsx')
 df3 = pd.read_excel('madden_nfl_16_-_full_player_ratings.xlsx')
 df4 = pd.read_excel('madden_nfl_17_-_full_player_ratings.xlsx')
 
@@ -43,10 +43,10 @@ fields = [
 			'Carrying', 'Catch', 'Catch in Traffic', 'Elusiveness', 'Finesse Moves',
 			'Handedness', 'Height', 'Hit Power', 'Impact Blocking', 'Injury', 'Juke Move', 'Jumping',
 			'Kick Accuracy', 'Kick Power', 'Kick Return', 'Man Coverage', 'Name', 'Overall Rating', 'Pass Block',
-			'Play Recognition', 'Play Action', 'Power Moves', 'Speed', 'Spin Move', 'Stamina', 'Stiff Arm',
+			'Play Recognition', 'Play Action', 'Position', 'Power Moves', 'Speed', 'Spin Move', 'Stamina', 'Stiff Arm',
 			'Strength', 'Tackle', 'Team', 'Throw Accuracy Deep', 'Throw Accuracy Mid', 'Throw Accuracy Short',
 			'Throw Power', 'Throw on the Run', 'Total Salary', 'Toughness', 'Trucking', 'Weight', 'Years Pro',
-			'Zone Coverage'
+			'Zone Coverage', 'Season'
 		]
 
 df1 = df1[fields]
@@ -55,93 +55,105 @@ df2 = df2[fields]
 
 madden_df = pd.concat([df1, df2])
 
+madden_df.to_csv('data/madden3.csv', index=False)
+
 # link = 'https://www.footballdb.com/fantasy-football/index.html?pos=QB%2CRB%2CWR%2CTE&yr=2017&wk=1&rules=1'
 
 ### SCRAPE NFL 2017 STATS PER PLAYER, PER GAME FROM FOOTBALLDB.COM
 
 ### OFFENSE STATS
 
-# def scrape_fballdb():
+def scrape_fballdb(year=2017, week):
+	"""
 
-weeks = range(1, 18)
-positions = ['QB','RB','WR','TE','K','DST']
-user_agent = 'Mozilla/5.0'
-headers = {'User-Agent': user_agent}
+	insert year and week of season to scrape
 
-# table is limited to 100 rows. so need to cycle through each week and each
-# position to capture as much as possible
-nfl_df = pd.DataFrame()
+	:param year:
+	:param weeks:
+	:return:
+	"""
 
-for week in weeks:
+	weeks = range(1, 18)
+	positions = ['QB','RB','WR','TE','K','DST']
+	user_agent = 'Mozilla/5.0'
+	headers = {'User-Agent': user_agent}
 
-	for position in positions:
+	# table is limited to 100 rows. so need to cycle through each week and each
+	# position to capture as much as possible
 
-		url = 'https://www.footballdb.com/fantasy-football/index.html?pos=' + str(position) + '&yr=2017&wk=' + str(week) + '&rules=1'
-		print(url)
+	nfl_df = pd.DataFrame()
 
-		response = requests.get(url, headers=headers)
+	for week in weeks:
 
-		soup = BeautifulSoup(response.text, 'lxml')
+		for position in positions:
 
-		table = soup.find_all('table')[0]
-		table
+			url = 'https://www.footballdb.com/fantasy-football/index.html?pos=' + \
+				  str(position) + '&yr=' + str(year) + '&wk=' + str(week) + '&rules=1'
+			print(url)
 
-		# capture headers from table
+			response = requests.get(url, headers=headers)
 
-		headers_ = ['Players','Game']
+			soup = BeautifulSoup(response.text, 'lxml')
 
-		for row in table.find_all('tr', class_="header right"):
-			for th in row.find_all('a', href=True):
-				headers_.append(th['title'])
+			table = soup.find_all('table')[0]
+			table
 
-		# capture data from table
-		table = table.find('tbody')
+			# capture headers from table
 
-		# find number of rows
-		n_columns = 0
-		n_rows = 0
+			headers_ = ['Players','Game']
 
-		for row in table.find_all('tr'):
+			for row in table.find_all('tr', class_="header right"):
+				for th in row.find_all('a', href=True):
+					headers_.append(th['title'])
 
-			# Determine the number of rows in the table
-			td_tags = row.find_all('td')
-			if len(td_tags) > 0:
-				n_rows += 1
-				if n_columns == 0:
-					# Set the number of columns for our table
-					n_columns = len(td_tags)
+			# capture data from table
+			table = table.find('tbody')
 
-		# initialize temp dataframe
-		temp = pd.DataFrame(columns=headers_, index=range(0, n_rows))
+			# find number of rows
+			n_columns = 0
+			n_rows = 0
 
-		row_marker = 0
-		for row in table.find_all('tr'):
-			column_marker = 0
-			columns = row.find_all('td')
-			for column in columns:
-				temp.iat[row_marker, column_marker] = column.get_text()
-				column_marker += 1
-			if len(columns) > 0:
-				row_marker += 1
+			for row in table.find_all('tr'):
 
-		#insert week number as field in dataframe
-		temp['week'] = week
-		temp['position'] = position
+				# Determine the number of rows in the table
+				td_tags = row.find_all('td')
+				if len(td_tags) > 0:
+					n_rows += 1
+					if n_columns == 0:
+						# Set the number of columns for our table
+						n_columns = len(td_tags)
 
-		for col in temp:
-			try:
-				temp[col] = temp[col].astype(float)
-			except ValueError:
-				pass
+			# initialize temp dataframe
+			temp = pd.DataFrame(columns=headers_, index=range(0, n_rows))
+
+			row_marker = 0
+			for row in table.find_all('tr'):
+				column_marker = 0
+				columns = row.find_all('td')
+				for column in columns:
+					temp.iat[row_marker, column_marker] = column.get_text()
+					column_marker += 1
+				if len(columns) > 0:
+					row_marker += 1
+
+			#insert week number as field in dataframe
+			temp['week'] = week
+			temp['position'] = position
+
+			for col in temp:
+				try:
+					temp[col] = temp[col].astype(float)
+				except ValueError:
+					pass
 
 
-		nfl_df = nfl_df.append(temp, ignore_index=True)
+			nfl_df = nfl_df.append(temp, ignore_index=True)
 
-nfl_df.to_csv('data/nfl_test.csv')
+	nfl_df.to_csv('data/nfl_test.csv')
 
-nfl_df2 = nfl_df.copy()
+	nfl_df2 = nfl_df.copy()
 
-return nfl_df
+	return nfl_df
 
 # scrape_fballdb()
 
