@@ -26,3 +26,6 @@ class Scoring():
 		self.pass_yds = pass_yds
 		self.pass_tds = pass_tds
 		self.int = int
+
+
+# https://stackoverflow.com/questions/1639174/creating-class-instance-properties-from-a-dictionary
