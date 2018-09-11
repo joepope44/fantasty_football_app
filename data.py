@@ -63,17 +63,17 @@ madden_df.to_csv('data/madden3.csv', index=False)
 
 ### OFFENSE STATS
 
-def scrape_fballdb(year=2017, week):
+def scrape_fballdb(year=2017, weeks):
 	"""
 
 	insert year and week of season to scrape
 
-	:param year:
-	:param weeks:
+	:param year: 2017 or 2018
+	:param weeks: can enter one week or multiple weeks, as a list
 	:return:
 	"""
 
-	weeks = range(1, 18)
+	# weeks = range(1, 18)
 	positions = ['QB','RB','WR','TE','K','DST']
 	user_agent = 'Mozilla/5.0'
 	headers = {'User-Agent': user_agent}

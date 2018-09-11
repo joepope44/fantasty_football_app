@@ -26,5 +26,9 @@ nfl_df[nfl_df['Position'] == 'DST']['Players']\
 nfl_df.drop(axis=1, columns="Unnamed: 0", inplace=True)
 
 
+nfl_df['Team'] = nfl_df[nfl_df['Position'] == 'DST']['Players'].apply(lambda x: x.rsplit(sep=' ', maxsplit=1)[-1])
+
+nfl_df['Team'] = nfl_df['Team'].apply(lambda x: str(x) if str(x).endswith('s') else str(x) + 's')
+
 nfl_df.to_csv('data/nfl_2017_clean.csv')
 

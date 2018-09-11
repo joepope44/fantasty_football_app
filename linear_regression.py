@@ -1,4 +1,4 @@
-# from nfl_madden.py import df
+from nfl_madden.py import df
 
 import matplotlib.pyplot as plt
 import numpy as np
