@@ -17,8 +17,7 @@ rb_nfl_fields = [
 wr_nfl_fields = te_nfl_fields = rb_nfl_fields
 
 dst_nfl_fields = [
-	'Fantasy Points', 'Game',
-	'Interceptions', 'Passing Yards Allowed', 'Players', 'Points Against',
+	'Fantasy Points', 'Interceptions', 'Passing Yards Allowed', 'Points Against',
 	'Rushing Yards Allowed', 'Sacks', 'Safeties', 'Total Yards Allowed',
 	'Touchdowns', 'Position', 'Week', 'Team'
 ]
@@ -38,12 +37,19 @@ def filter_nfl_data(pos, fields):
 
 	return temp
 
+# 2017 NFL data
 
 nfl_qb = filter_nfl_data('QB', qb_nfl_fields)
 nfl_rb = filter_nfl_data('RB', rb_nfl_fields)
 nfl_wr = filter_nfl_data('WR', wr_nfl_fields)
 nfl_te = filter_nfl_data('TE', te_nfl_fields)
 nfl_dst = filter_nfl_data('DST', dst_nfl_fields)
+nfl_dst_agg = nfl_dst.groupby('Team').mean().reset_index()
+
+# 2018 NFL data
+
+nfl_qb_2018 = filter_nfl_data('QB', qb_nfl_fields)
+
 
 # MADDEN FIELDS PER POSITION
 
@@ -94,13 +100,13 @@ def filter_madden_data(pos, fields, season):
 	madden = pd.read_csv('data/madden3.csv')
 
 	# handle DST and OL positions
-	DST_list = ['LOLB', 'MLB', 'RE', 'LE', 'CB', 'FS', 'SS', 'ROLB', 'DT']
-	OL_list = ['LT', 'LG', 'C', 'RG', 'RT']
+	dst_list = ['LOLB', 'MLB', 'RE', 'LE', 'CB', 'FS', 'SS', 'ROLB', 'DT']
+	ol_list = ['LT', 'LG', 'C', 'RG', 'RT']
 
 	if pos == 'DST':
-		temp = madden[madden['Position'].isin(DST_list)]
+		temp = madden[madden['Position'].isin(dst_list)]
 	elif pos == 'OL':
-		temp = madden[madden['Position'].isin(OL_list)]
+		temp = madden[madden['Position'].isin(ol_list)]
 	else:
 		temp = madden[madden['Position'] == pos]
 
@@ -109,6 +115,7 @@ def filter_madden_data(pos, fields, season):
 
 	return temp
 
+# 2017 Madden filtered data
 
 mad_qb = filter_madden_data('QB', mad_qb_fields, '2017-2018')
 mad_rb = filter_madden_data('HB', mad_rb_fields, '2017-2018')
@@ -117,85 +124,79 @@ mad_wr = filter_madden_data('WR', mad_wr_fields, '2017-2018')
 mad_dst = filter_madden_data('DST', mad_dst_fields, '2017-2018')
 mad_ol = filter_madden_data('OL', mad_offline_fields, '2017-2018')
 
-# average top 7 offensive line players per team
-# mad_ol = mad_ol.groupby('Team', as_index=False)\
-# 	.sort_values(by='Overall Rating', ascending=False)\
-# 	.head(5)\
-# 	.mean()
+# 2018 Madden filtered data
 
-# mad_ol.groupby('Team', as_index=False).agg
+mad_qb_2018 = filter_madden_data('QB', mad_qb_fields, '2018-2019')
 
 # take the max rating for each offensive line position, ignore all other ratings
-mad_ol_agg = mad_ol.pivot_table(values='Overall Rating',
-								index='Team',
-								columns='Position',
-								aggfunc=np.max).reset_index()
+mad_ol_agg = mad_ol.pivot_table(
+	values='Overall Rating',
+	index='Team',
+	columns='Position',
+	aggfunc=np.max).reset_index()
 
 # create average of the OL
 mad_ol_agg['OL_AVG'] = mad_ol_agg.mean(axis=1)
 
 # take max rating for each defensive player
-mad_dst_agg = mad_dst.pivot_table(values='Overall Rating',
-					index='Team',
-					columns='Position',
-					aggfunc=np.max).reset_index()
+mad_dst_agg = mad_dst.pivot_table(
+	values='Overall Rating',
+	index='Team',
+	columns='Position',
+	aggfunc=np.max).reset_index()
 
 mad_dst_agg['DST_AVG'] = mad_dst_agg.mean(axis=1).round(1)
 
 mad_dst_agg['Backfield_AVG'] = mad_dst_agg[['CB', 'FS', 'SS']].mean(axis=1).round(1)
-
 mad_dst_agg['Linebackers AVG'] = mad_dst_agg[['LOLB', 'MLB', 'ROLB']].mean(axis=1).round(1)
-
 mad_dst_agg['DL_AVG'] = mad_dst_agg[['DT', 'LE', 'RE']].mean(axis=1).round(1)
 
 
-# mad_ol.columns = [str(col) + '_OL' for col in mad_ol.columns]
-
-# need to figure out how to handle DST and OL, position doesn't match up with
-# NFL data
-
 def merge_nfl_madden(nfl_pos_df, mad_pos_df):
 	"""
-	function merges nfl_df and madden_df by position and season
-	:param nfl_df: name of nfl dataframe, filtered by position
-	:param madden_df: name of madden dataframe filtered by position
-	:param dst: default to False. if merging defense, set to True
-	:return:
+	:param nfl_pos_df: nfl positional dataframe, if DST use diff fields to merge
+	:param mad_pos_df: madden positional dataframe
+	:return: merged dataframe to be used for further processing
 	"""
-	if nfl_pos_df.Position.iloc[1] == 'DST':
-		temp = pd.merge(nfl_pos_df, mad_pos_df, how='inner', left_on='Team', right_on='Team')
-	else:
-		temp = pd.merge(nfl_pos_df, mad_pos_df, how='inner', left_on='Players', right_on='Name')
-	return temp
+	return pd.merge(nfl_pos_df, mad_pos_df, how='inner', left_on='Players', right_on='Name')
 
 
-dst_data = merge_nfl_madden(nfl_dst, mad_dst)
+def merge_nfl_madden_dst(nfl_pos_df, mad_pos_df):
+	"""
+
+	:param nfl_pos_df: DST NFL data
+	:param mad_pos_df: DST madden data
+	:return: merged dataframe, aggregate DST data
+	"""
+	return pd.merge(nfl_pos_df, mad_pos_df, how='inner', left_on='Team', right_on='Team')
+
+# 2017 merged NFL and Madden data
+
+dst_data = merge_nfl_madden_dst(nfl_dst_agg, mad_dst_agg)
 qb_data = merge_nfl_madden(nfl_qb, mad_qb)
 rb_data = merge_nfl_madden(nfl_rb, mad_rb)
 wr_data = merge_nfl_madden(nfl_wr, mad_wr)
 te_data = merge_nfl_madden(nfl_te, mad_te)
 
-# aggregate defensive stats for top 14 players by Overall Rating
-dst_data.columns = [str(col) + '_DST' for col in dst_data.columns]
-dst_agg_data = (dst_data.groupby('Team_DST')
-				.mean()
-				.sort_values(by='Overall Rating_DST', ascending=False)
-				.head(14)
-				.round(3))
+# 2018 merged NFL and Madden data
+qb_data_2018 = merge_nfl_madden(nfl_qb_2018, mad_qb_2018)
 
-# dst_data.to_csv('data/dst_data_clean.csv')
 
 # preprocess before regression analysis. look at player, their opponents DST
 # their offensive line.
 
 sched = pd.read_excel('data/2017_NFL_Schedule.xlsx')
+sched2018 = pd.read_excel('data/2018_NFL_schedule.xlsx')
+
+sched2018['Week'] = sched2018['Week'].astype(float)
 sched['Week'] = sched['Week'].astype(float)
 
 
-def regr_preprocess(pos_data):
-	global dst_data
-	global mad_ol
-	global sched
+def regr_preprocess(pos_data, sched):
+	"""
+	:param pos_data: qb, rb, wr, te data
+	:return: dataframe to be used for modeling
+	"""
 
 	# merge all home and away game schedule data with positional NFL and Madden data
 	away = pd.merge(pos_data, sched, left_on=['Week', 'Team'], right_on=['Week', 'Away'])
@@ -217,18 +218,25 @@ def regr_preprocess(pos_data):
 	df.drop(['Home', 'Away'], axis=1, inplace=True)
 
 	# merge offensive line stats
-	df = pd.merge(df, mad_ol, how='left', on='Team')
+	df = pd.merge(df, mad_ol_agg, on='Team')
 
 	# merge defensive stats
-	df = pd.merge(df, dst_agg_data, how='left', left_on='Opponent', right_on='Team_DST')
+	df = pd.merge(df, dst_data, left_on='Opponent', right_on='Team')
 
 	return df
 
 
-tmp = regr_preprocess(qb_data)
+# 2017 data, used to build regression model
+tmp = regr_preprocess(qb_data, sched)
 tmp.shape
 
+qb2018 = regr_preprocess(qb_data, sched2018)
+qb2018.shape
+
+
+
 tmp.to_csv('data/check.csv')
+
 #
 # def test_data(player, position, opponent):
 # 	tmp = regr_preprocess(qb_data)
