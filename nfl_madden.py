@@ -23,7 +23,7 @@ dst_nfl_fields = [
 ]
 
 
-def filter_nfl_data(pos, fields):
+def filter_nfl_data(pos, fields, year):
 	"""
 	function filters nfl data by position and fields. data should be pre-filtered
 	by season.
@@ -31,11 +31,9 @@ def filter_nfl_data(pos, fields):
 	:param fields: List of fields that should be kept and treated as features
 	:return: pandas dataframe filtered to position and fields
 	"""
-	nfl = pd.read_csv('data/nfl_2017_clean.csv')
+	nfl = pd.read_csv('data/nfl_' + str(year) + '_clean.csv')
 	nfl_by_pos = nfl[nfl['Position'] == pos]
-	temp = nfl_by_pos[fields]
-
-	return temp
+	return nfl_by_pos[fields]
 
 # 2017 NFL data
 
@@ -48,7 +46,7 @@ nfl_dst_agg = nfl_dst.groupby('Team').mean().reset_index()
 
 # 2018 NFL data
 
-nfl_qb_2018 = filter_nfl_data('QB', qb_nfl_fields)
+nfl_qb_2018 = filter_nfl_data('QB', qb_nfl_fields, 2018)
 
 
 # MADDEN FIELDS PER POSITION
@@ -230,9 +228,9 @@ def regr_preprocess(pos_data, sched):
 tmp = regr_preprocess(qb_data, sched)
 tmp.shape
 
-qb2018 = regr_preprocess(qb_data, sched2018)
+qb2018 = regr_preprocess(qb_data_2018, sched2018)
 qb2018.shape
-
+qb2018.to_csv('data/qb2018.csv', index=False)
 
 
 tmp.to_csv('data/check.csv')

@@ -26,7 +26,7 @@ df2 = pd.read_excel('data/Madden 18 Player Ratings.xlsx')
 df3 = pd.read_excel('madden_nfl_16_-_full_player_ratings.xlsx')
 df4 = pd.read_excel('madden_nfl_17_-_full_player_ratings.xlsx')
 
-#clean up dataframe columns
+# clean up dataframe columns
 
 df1.rename(columns={'BC Vision': 'Ball Carrier Vision'}, inplace=True)
 df1.rename(columns={'Overall': 'Overall Rating'}, inplace=True)
@@ -63,7 +63,8 @@ madden_df.to_csv('data/madden3.csv', index=False)
 
 ### OFFENSE STATS
 
-def scrape_fballdb(year=2017, weeks):
+
+def scrape_fballdb(weeks, year=2017):
 	"""
 
 	insert year and week of season to scrape
@@ -74,7 +75,7 @@ def scrape_fballdb(year=2017, weeks):
 	"""
 
 	# weeks = range(1, 18)
-	positions = ['QB','RB','WR','TE','K','DST']
+	positions = ['QB', 'RB', 'WR', 'TE', 'K', 'DST']
 	user_agent = 'Mozilla/5.0'
 	headers = {'User-Agent': user_agent}
 
@@ -82,6 +83,7 @@ def scrape_fballdb(year=2017, weeks):
 	# position to capture as much as possible
 
 	nfl_df = pd.DataFrame()
+	weeks = [weeks]
 
 	for week in weeks:
 
@@ -137,8 +139,8 @@ def scrape_fballdb(year=2017, weeks):
 					row_marker += 1
 
 			#insert week number as field in dataframe
-			temp['week'] = week
-			temp['position'] = position
+			temp['Week'] = week
+			temp['Position'] = position
 
 			for col in temp:
 				try:
@@ -149,23 +151,46 @@ def scrape_fballdb(year=2017, weeks):
 
 			nfl_df = nfl_df.append(temp, ignore_index=True)
 
-	nfl_df.to_csv('data/nfl_test.csv')
+	nfl_df.to_csv('data/nfl_test' + str(year) + '.csv', index=False)
 
-	nfl_df2 = nfl_df.copy()
+	# nfl_df2 = nfl_df.copy()
 
 	return nfl_df
 
-# scrape_fballdb()
 
-nfl_df.Players.head()
+nfl_df_2018 = scrape_fballdb(weeks=1, year=2018)
 
-# nfl_df.Players.replace('(.\.\S*)', " ", regex=True)
+nfl_df_2018 = pd.read_csv('data/nfl_test2018.csv')
 
-nfl_df.Players.str.replace("&nbsp", " ")
-nfl_df.Players.replace('[^.\w]+', " ", regex=True)
-nfl_df.Players.replace('(.\.\S*)', " ", regex=True).head()
 
-nfl_df.Players.head()
+def clean_nfl_player_names(df):
 
-# newtext = t.replace("&nbsp", "")
-#    t.replace_with(newtext)
+	df['Players'] = df['Players'].apply(lambda x: str(x).rsplit(sep='.', maxsplit=1)[0][:-1])
+	return df
+
+
+nfl_df_2018 = clean_nfl_player_names(nfl_df_2018)
+
+
+def clean_teams(team):
+	if team[:-2][0].isupper():
+		return team[:-2]
+	else:
+		return team[:-1]
+
+
+def clean_nfl_team_names(df, year):
+	df.loc[df['Position'] == 'DST','Players'] = \
+	df[df['Position'] == 'DST']['Players']\
+		.apply(lambda x: clean_teams(x))
+
+	df['Team'] = df[df['Position'] == 'DST']['Players'].apply(lambda x: x.rsplit(sep=' ', maxsplit=1)[-1])
+
+	df['Team'] = df['Team'].apply(lambda x: str(x) if str(x).endswith('s') else str(x) + 's')
+	df.to_csv('data/nfl_' + str(year) + '_clean.csv', index=False)
+	return df
+
+
+clean_nfl_team_names(nfl_df_2018, 2018)
+
+nfl_2018_clean = pd.read_csv('data/nfl_2018_clean.csv')
