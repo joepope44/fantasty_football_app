@@ -59,22 +59,21 @@ madden_df.to_csv('data/madden3.csv', index=False)
 
 # link = 'https://www.footballdb.com/fantasy-football/index.html?pos=QB%2CRB%2CWR%2CTE&yr=2017&wk=1&rules=1'
 
-### SCRAPE NFL 2017 STATS PER PLAYER, PER GAME FROM FOOTBALLDB.COM
+# SCRAPE NFL 2017 STATS PER PLAYER, PER GAME FROM FOOTBALLDB.COM
 
-### OFFENSE STATS
+# OFFENSE STATS
 
 
-def scrape_fballdb(weeks, year=2017):
+def scrape_fballdb(beg_week, end_week, year=2017):
 	"""
-
 	insert year and week of season to scrape
-
+	:param beg_week: first week of data to retrieve
+	:param end_week: last week of data to retrieve
 	:param year: 2017 or 2018
-	:param weeks: can enter one week or multiple weeks, as a list
 	:return:
 	"""
 
-	# weeks = range(1, 18)
+	weeks = [week for week in range(beg_week, end_week + 1)]
 	positions = ['QB', 'RB', 'WR', 'TE', 'K', 'DST']
 	user_agent = 'Mozilla/5.0'
 	headers = {'User-Agent': user_agent}
@@ -83,14 +82,14 @@ def scrape_fballdb(weeks, year=2017):
 	# position to capture as much as possible
 
 	nfl_df = pd.DataFrame()
-	weeks = [weeks]
 
 	for week in weeks:
 
 		for position in positions:
 
-			url = 'https://www.footballdb.com/fantasy-football/index.html?pos=' + \
-				  str(position) + '&yr=' + str(year) + '&wk=' + str(week) + '&rules=1'
+			url = 'https://www.footballdb.com/fantasy-football/index.html?pos=' +\
+				str(position) + '&yr=' + str(year) + \
+				'&wk=' + str(week) + '&rules=1'
 			print(url)
 
 			response = requests.get(url, headers=headers)
@@ -98,11 +97,10 @@ def scrape_fballdb(weeks, year=2017):
 			soup = BeautifulSoup(response.text, 'lxml')
 
 			table = soup.find_all('table')[0]
-			table
 
 			# capture headers from table
 
-			headers_ = ['Players','Game']
+			headers_ = ['Players', 'Game']
 
 			for row in table.find_all('tr', class_="header right"):
 				for th in row.find_all('a', href=True):
@@ -125,7 +123,7 @@ def scrape_fballdb(weeks, year=2017):
 						# Set the number of columns for our table
 						n_columns = len(td_tags)
 
-			# initialize temp dataframe
+			# initialize temp DataFrame
 			temp = pd.DataFrame(columns=headers_, index=range(0, n_rows))
 
 			row_marker = 0
@@ -138,7 +136,7 @@ def scrape_fballdb(weeks, year=2017):
 				if len(columns) > 0:
 					row_marker += 1
 
-			#insert week number as field in dataframe
+			# insert week number as field in dataframe
 			temp['Week'] = week
 			temp['Position'] = position
 
@@ -148,23 +146,27 @@ def scrape_fballdb(weeks, year=2017):
 				except ValueError:
 					pass
 
-
 			nfl_df = nfl_df.append(temp, ignore_index=True)
 
-	nfl_df.to_csv('data/nfl_test' + str(year) + '.csv', index=False)
-
-	# nfl_df2 = nfl_df.copy()
+	nfl_df.to_csv(
+		'data/nfl_test_yr' + str(year) + '_ wks' + str(beg_week) + '-' +
+		str(end_week) + '_.csv', index=False
+	)
 
 	return nfl_df
 
 
-nfl_df_2018 = scrape_fballdb(weeks=1, year=2018)
+nfl_df_2018 = scrape_fballdb(beg_week=1, end_week=2, year=2018)
 
-nfl_df_2018 = pd.read_csv('data/nfl_test2018.csv')
+# nfl_df_2018 = pd.to_csv('data/nfl_test2018.csv')
 
 
 def clean_nfl_player_names(df):
-
+	"""
+	handles scraping error like New York GiantsNYG.
+	:param df:
+	:return:
+	"""
 	df['Players'] = df['Players'].apply(lambda x: str(x).rsplit(sep='.', maxsplit=1)[0][:-1])
 	return df
 
@@ -173,6 +175,11 @@ nfl_df_2018 = clean_nfl_player_names(nfl_df_2018)
 
 
 def clean_teams(team):
+	"""
+	to be used in clean_nfl_team_names below
+	:param team:
+	:return:
+	"""
 	if team[:-2][0].isupper():
 		return team[:-2]
 	else:

@@ -29,24 +29,50 @@ def filter_nfl_data(pos, fields, year):
 	by season.
 	:param pos: NFL Position, choice are 'QB','RB','TE,'WR','DST','K'
 	:param fields: List of fields that should be kept and treated as features
-	:return: pandas dataframe filtered to position and fields
+	:param year: year that the season begins. 2018-2019, should be 2018.
+	:return: pandas DataFrame filtered to position and fields
 	"""
 	nfl = pd.read_csv('data/nfl_' + str(year) + '_clean.csv')
 	nfl_by_pos = nfl[nfl['Position'] == pos]
-	return nfl_by_pos[fields]
+	nfl_by_pos = nfl_by_pos[fields]
+	nfl_by_pos['Year'] = float(year)
+	return nfl_by_pos
+
 
 # 2017 NFL data
 
-nfl_qb = filter_nfl_data('QB', qb_nfl_fields)
-nfl_rb = filter_nfl_data('RB', rb_nfl_fields)
-nfl_wr = filter_nfl_data('WR', wr_nfl_fields)
-nfl_te = filter_nfl_data('TE', te_nfl_fields)
-nfl_dst = filter_nfl_data('DST', dst_nfl_fields)
+nfl_qb = filter_nfl_data('QB', qb_nfl_fields, 2017)
+nfl_rb = filter_nfl_data('RB', rb_nfl_fields, 2017)
+nfl_wr = filter_nfl_data('WR', wr_nfl_fields, 2017)
+nfl_te = filter_nfl_data('TE', te_nfl_fields, 2017)
+
+# DST is handled differently
+nfl_dst = filter_nfl_data('DST', dst_nfl_fields, 2017)
 nfl_dst_agg = nfl_dst.groupby('Team').mean().reset_index()
 
 # 2018 NFL data
 
 nfl_qb_2018 = filter_nfl_data('QB', qb_nfl_fields, 2018)
+nfl_rb_2018 = filter_nfl_data('RB', rb_nfl_fields, 2018)
+nfl_wr_2018 = filter_nfl_data('WR', wr_nfl_fields, 2018)
+nfl_te_2018 = filter_nfl_data('TE', te_nfl_fields, 2018)
+
+nfl_dst_2018 = filter_nfl_data('DST', dst_nfl_fields, 2018)
+nfl_dst_agg_2018 = nfl_dst_2018.groupby('Team').mean().reset_index()
+
+
+# 2017-2018 data
+
+nfl_qb_alltime = pd.concat([nfl_qb, nfl_qb_2018])
+nfl_qb_alltime['Completion Rate'] = nfl_qb_alltime['Pass Completions'] / nfl_qb_alltime['Pass Attempts']
+nfl_qb_alltime['Yards Per Attempt'] = nfl_qb_alltime['Passing Yards'] / nfl_qb_alltime['Pass Attempts']
+nfl_qb_alltime['Yards Per Completion'] = nfl_qb_alltime['Passing Yards'] / nfl_qb_alltime['Pass Completions']
+
+nfl_rb_alltime = pd.concat([nfl_rb, nfl_rb_2018])
+nfl_te_alltime = pd.concat([nfl_te, nfl_te_2018])
+nfl_wr_alltime = pd.concat([nfl_wr, nfl_te_2018])
+nfl_dst_alltime = pd.concat([nfl_dst_agg, nfl_dst_agg_2018])
+
 
 
 # MADDEN FIELDS PER POSITION
@@ -88,7 +114,7 @@ mad_wr_fields = mad_te_fields = mad_rb_fields
 
 ######
 
-def filter_madden_data(pos, fields, season):
+def filter_madden_data(pos, fields):
 	"""
 	:param pos: NFL Position, choice are 'QB','RB','TE,'WR','DST','K'
 	:param fields: List of fields that should be kept and treated as features
@@ -108,23 +134,20 @@ def filter_madden_data(pos, fields, season):
 	else:
 		temp = madden[madden['Position'] == pos]
 
-	temp = temp[temp['Season'] == season]
 	temp = temp[fields]
+	temp['Year'] = temp['Season'].apply(lambda x: x[:4])
 
 	return temp
 
-# 2017 Madden filtered data
 
-mad_qb = filter_madden_data('QB', mad_qb_fields, '2017-2018')
-mad_rb = filter_madden_data('HB', mad_rb_fields, '2017-2018')
-mad_te = filter_madden_data('TE', mad_te_fields, '2017-2018')
-mad_wr = filter_madden_data('WR', mad_wr_fields, '2017-2018')
-mad_dst = filter_madden_data('DST', mad_dst_fields, '2017-2018')
-mad_ol = filter_madden_data('OL', mad_offline_fields, '2017-2018')
+# Collect Madden filtered data by position, all seasons
 
-# 2018 Madden filtered data
-
-mad_qb_2018 = filter_madden_data('QB', mad_qb_fields, '2018-2019')
+mad_qb = filter_madden_data('QB', mad_qb_fields)
+mad_rb = filter_madden_data('HB', mad_rb_fields)
+mad_te = filter_madden_data('TE', mad_te_fields)
+mad_wr = filter_madden_data('WR', mad_wr_fields)
+mad_dst = filter_madden_data('DST', mad_dst_fields)
+mad_ol = filter_madden_data('OL', mad_offline_fields)
 
 # take the max rating for each offensive line position, ignore all other ratings
 mad_ol_agg = mad_ol.pivot_table(
@@ -136,49 +159,64 @@ mad_ol_agg = mad_ol.pivot_table(
 # create average of the OL
 mad_ol_agg['OL_AVG'] = mad_ol_agg.mean(axis=1)
 
+
 # take max rating for each defensive player
-mad_dst_agg = mad_dst.pivot_table(
-	values='Overall Rating',
-	index='Team',
-	columns='Position',
-	aggfunc=np.max).reset_index()
 
-mad_dst_agg['DST_AVG'] = mad_dst_agg.mean(axis=1).round(1)
+def setup_mad_dst(df):
+	"""
+	:param df: input madden DST DataFrame
+	:return: aggregated DataFrame, with average ratings of top defenders
+	"""
+	mad_dst_agg = df.pivot_table(
+		values='Overall Rating',
+		index=['Team', 'Year'],
+		columns='Position',
+		aggfunc=np.max).reset_index()
 
-mad_dst_agg['Backfield_AVG'] = mad_dst_agg[['CB', 'FS', 'SS']].mean(axis=1).round(1)
-mad_dst_agg['Linebackers AVG'] = mad_dst_agg[['LOLB', 'MLB', 'ROLB']].mean(axis=1).round(1)
-mad_dst_agg['DL_AVG'] = mad_dst_agg[['DT', 'LE', 'RE']].mean(axis=1).round(1)
+	mad_dst_agg['DST_AVG'] = mad_dst_agg.mean(axis=1).round(1)
 
+	mad_dst_agg['Backfield_AVG'] = mad_dst_agg[['CB', 'FS', 'SS']].mean(axis=1).round(1)
+	mad_dst_agg['Linebackers AVG'] = mad_dst_agg[['LOLB', 'MLB', 'ROLB']].mean(axis=1).round(1)
+	mad_dst_agg['DL_AVG'] = mad_dst_agg[['DT', 'LE', 'RE']].mean(axis=1).round(1)
+
+	return mad_dst_agg
+
+
+mad_dst_agg = setup_mad_dst(mad_dst)
+mad_dst_agg.Year = mad_dst_agg.Year.astype(float)
 
 def merge_nfl_madden(nfl_pos_df, mad_pos_df):
 	"""
-	:param nfl_pos_df: nfl positional dataframe, if DST use diff fields to merge
-	:param mad_pos_df: madden positional dataframe
-	:return: merged dataframe to be used for further processing
+	:param nfl_pos_df: nfl positional DataFrame, if DST use diff fields to merge
+	:param mad_pos_df: madden positional DataFrame
+	:return: merged DataFrame to be used for further processing
 	"""
-	return pd.merge(nfl_pos_df, mad_pos_df, how='inner', left_on='Players', right_on='Name')
+	tmp = pd.merge(
+		nfl_pos_df, mad_pos_df, how='inner', left_on=['Players', 'Year', 'Position'],
+		right_on=['Name', 'Year', 'Position']
+	)
+	tmp.Year = tmp.Year.astype(float)
+
+	return tmp
 
 
 def merge_nfl_madden_dst(nfl_pos_df, mad_pos_df):
 	"""
-
 	:param nfl_pos_df: DST NFL data
 	:param mad_pos_df: DST madden data
 	:return: merged dataframe, aggregate DST data
 	"""
-	return pd.merge(nfl_pos_df, mad_pos_df, how='inner', left_on='Team', right_on='Team')
+	tmp = pd.merge(nfl_pos_df, mad_pos_df, how='inner', left_on=['Team', 'Year'], right_on=['Team', 'Year'])
+	tmp.Year = tmp.Year.astype(float)
+	return tmp
 
-# 2017 merged NFL and Madden data
 
-dst_data = merge_nfl_madden_dst(nfl_dst_agg, mad_dst_agg)
-qb_data = merge_nfl_madden(nfl_qb, mad_qb)
-rb_data = merge_nfl_madden(nfl_rb, mad_rb)
-wr_data = merge_nfl_madden(nfl_wr, mad_wr)
-te_data = merge_nfl_madden(nfl_te, mad_te)
-
-# 2018 merged NFL and Madden data
-qb_data_2018 = merge_nfl_madden(nfl_qb_2018, mad_qb_2018)
-
+qb_data_alltime = merge_nfl_madden(nfl_qb_alltime, mad_qb)
+rb_data_alltime = merge_nfl_madden(nfl_rb_alltime, mad_rb)
+wr_data_alltime = merge_nfl_madden(nfl_wr_alltime, mad_wr)
+te_data_alltime = merge_nfl_madden(nfl_te_alltime, mad_te)
+dst_data_alltime = merge_nfl_madden_dst(nfl_dst_alltime, mad_dst_agg)
+dst_data_alltime.drop('Week', inplace=True, axis=1)
 
 # preprocess before regression analysis. look at player, their opponents DST
 # their offensive line.
@@ -189,22 +227,29 @@ sched2018 = pd.read_excel('data/2018_NFL_schedule.xlsx')
 sched2018['Week'] = sched2018['Week'].astype(float)
 sched['Week'] = sched['Week'].astype(float)
 
+sched2018['Year'] = 2018
+sched['Year'] = 2017
 
-def regr_preprocess(pos_data, sched):
+supersched = pd.concat([sched, sched2018])
+supersched.Year = supersched.Year.astype(float)
+supersched.to_csv('data/full_schedule.csv')
+
+def regr_preprocess(pos_data):
 	"""
 	:param pos_data: qb, rb, wr, te data
-	:return: dataframe to be used for modeling
+	:return: DataFrame to be used for modeling
 	"""
+	global supersched  # 2017 and 2018 schedule with week and year
 
 	# merge all home and away game schedule data with positional NFL and Madden data
-	away = pd.merge(pos_data, sched, left_on=['Week', 'Team'], right_on=['Week', 'Away'])
-	home = pd.merge(pos_data, sched, left_on=['Week', 'Team'], right_on=['Week', 'Home'])
+	away = pd.merge(pos_data, supersched, left_on=['Week', 'Team', 'Year'], right_on=['Week', 'Away', 'Year'])
+	home = pd.merge(pos_data, supersched, left_on=['Week', 'Team', 'Year'], right_on=['Week', 'Home', 'Year'])
 	df = pd.concat([away, home])
 
 	df.drop([
-		'Game', 'Position_x', 'Position_y', 'Handedness', 'Players', 'Season', 'Day',
+		'Game', 'Position', 'Handedness', 'Players', 'Season', 'Day',
 		'Date', 'Time', 'Winner/tie', 'At', 'Loser/tie', 'Away Team', 'Home Team ',
-		'PtsW', 'PtsL', 'TOW', 'YdsL', 'TOL'
+		'PtsW', 'PtsL', 'TOW', 'YdsL', 'TOL', 'YdsW'
 	], axis=1, inplace=True)
 
 	# input one if players team is home team, else zero for away team.
@@ -216,24 +261,23 @@ def regr_preprocess(pos_data, sched):
 	df.drop(['Home', 'Away'], axis=1, inplace=True)
 
 	# merge offensive line stats
-	df = pd.merge(df, mad_ol_agg, on='Team')
+	mad_ol_alltime = pd.read_excel('data/mad_ol_alltime.xlsx')
+	df = pd.merge(df, mad_ol_alltime, on=['Team', 'Year'])
 
-	# merge defensive stats
-	df = pd.merge(df, dst_data, left_on='Opponent', right_on='Team')
+	# merge defensive stats. these are aggregates for the year, not weekly.
+	df = pd.merge(
+		df, dst_data_alltime, left_on=['Opponent', 'Year'],
+		right_on=['Team', 'Year'], how='left', suffixes=('_x', '_Opponent'),
+	)
 
 	return df
 
 
-# 2017 data, used to build regression model
-tmp = regr_preprocess(qb_data, sched)
-tmp.shape
+qb_all = regr_preprocess(qb_data_alltime)
 
-qb2018 = regr_preprocess(qb_data_2018, sched2018)
-qb2018.shape
-qb2018.to_csv('data/qb2018.csv', index=False)
+qb_all.to_csv('data/qb_all.csv', index=False)
 
 
-tmp.to_csv('data/check.csv')
 
 #
 # def test_data(player, position, opponent):
